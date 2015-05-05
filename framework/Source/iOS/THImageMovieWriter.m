@@ -293,27 +293,32 @@ NSString *const kTHImageColorSwizzlingFragmentShaderString = SHADER_STRING
     }
 
     //NSLog(@"audioTracks: %@", audioTracks);
+    if (audioTracks.count > 0) {
+        _hasAudioTrack = YES;
 
-    AVMutableComposition* mixComposition = [AVMutableComposition composition];
+        AVMutableComposition* mixComposition = [AVMutableComposition composition];
 
-    for(AVAssetTrack *track in audioTracks){
-        if(![track isKindOfClass:[NSNull class]]){
-            //NSLog(@"track url: %@ duration: %.2f", track.asset, CMTimeGetSeconds(track.asset.duration));
-            AVMutableCompositionTrack *compositionCommentaryTrack = [mixComposition addMutableTrackWithMediaType:AVMediaTypeAudio
+        for(AVAssetTrack *track in audioTracks){
+            if(![track isKindOfClass:[NSNull class]]){
+                //NSLog(@"track url: %@ duration: %.2f", track.asset, CMTimeGetSeconds(track.asset.duration));
+                AVMutableCompositionTrack *compositionCommentaryTrack = [mixComposition addMutableTrackWithMediaType:AVMediaTypeAudio
 
-                                                                                                preferredTrackID:kCMPersistentTrackID_Invalid];
-            [compositionCommentaryTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, track.asset.duration)
-                                                ofTrack:track
-                                                 atTime:kCMTimeZero error:nil];
+                                                                                                    preferredTrackID:kCMPersistentTrackID_Invalid];
+                [compositionCommentaryTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, track.asset.duration)
+                                                    ofTrack:track
+                                                     atTime:kCMTimeZero error:nil];
+            }
         }
+
+        self.assetAudioReader = [AVAssetReader assetReaderWithAsset:mixComposition error:nil];
+        self.assetAudioReaderTrackOutput =
+                [[AVAssetReaderAudioMixOutput alloc] initWithAudioTracks:[mixComposition tracksWithMediaType:AVMediaTypeAudio]
+                                                           audioSettings:nil];
+
+        [self.assetAudioReader addOutput:self.assetAudioReaderTrackOutput];
+    } else {
+        _hasAudioTrack = NO;
     }
-
-    self.assetAudioReader = [AVAssetReader assetReaderWithAsset:mixComposition error:nil];
-    self.assetAudioReaderTrackOutput =
-            [[AVAssetReaderAudioMixOutput alloc] initWithAudioTracks:[mixComposition tracksWithMediaType:AVMediaTypeAudio]
-                                                       audioSettings:nil];
-
-    [self.assetAudioReader addOutput:self.assetAudioReaderTrackOutput];
 
 }
 
@@ -364,11 +369,14 @@ NSString *const kTHImageColorSwizzlingFragmentShaderString = SHADER_STRING
         alreadyFinishedRecording = NO;
         isRecording = YES;
 
-        BOOL aduioReaderStartSuccess = [self.assetAudioReader startReading];
-        if(!aduioReaderStartSuccess){
-            NSLog(@"asset audio reader start reading failed: %@", self.assetAudioReader.error);
-            return;
+        if (self.assetAudioReader != nil) {
+            BOOL aduioReaderStartSuccess = [self.assetAudioReader startReading];
+            if(!aduioReaderStartSuccess){
+                NSLog(@"asset audio reader start reading failed: %@", self.assetAudioReader.error);
+                return;
+            }
         }
+
 
         startTime = kCMTimeInvalid;
         [self.assetWriter startWriting];
